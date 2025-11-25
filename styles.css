@@ -246,6 +246,12 @@ textarea:focus {
   margin-bottom: 4px;
 }
 
+.result-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .badge {
   padding: 8px 12px;
   border-radius: 999px;
@@ -253,6 +259,30 @@ textarea:focus {
   background: var(--panel-strong);
   font-weight: 600;
   color: #d7e7ff;
+}
+
+.view-toggle {
+  display: inline-flex;
+  gap: 6px;
+  background: var(--panel-strong);
+  border-radius: 12px;
+  padding: 4px;
+}
+
+.view-btn {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 150ms ease, transform 150ms ease;
+}
+
+.view-btn.active {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
 }
 
 .result-body {
@@ -299,6 +329,13 @@ textarea:focus {
   border-radius: 10px;
   border: 1px solid var(--border);
   font-family: var(--mono);
+}
+
+.param .value {
+  grid-column: 1 / -1;
+  color: var(--text);
+  font-family: var(--mono);
+  word-break: break-word;
 }
 
 .param .shape {

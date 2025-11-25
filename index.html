@@ -1,90 +1,490 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ABI Guesser Playground</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Chivo+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenChain ABI Guesser</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Ethers.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.11.1/ethers.umd.min.js"></script>
+
+    <style>
+        body {
+            background-color: #020617; /* slate-950 */
+            color: #e2e8f0; /* slate-200 */
+        }
+        /* Custom scrollbar for dropdowns */
+        select option {
+            background-color: #1e293b; /* slate-800 */
+            color: #e2e8f0;
+        }
+    </style>
 </head>
 <body>
-  <div class="page">
-    <header class="hero">
-      <p class="eyebrow">openchainxyz/abi-guesser</p>
-      <h1>ABI Guesser Playground</h1>
-      <p class="lede">
-        Paste call data or raw ABI-encoded parameters and let the library infer the function signature and parameter types for you.
-      </p>
-      <div class="hero-actions">
-        <button class="chip" data-fill="call">Load call data sample</button>
-        <button class="chip" data-fill="params">Load params-only sample</button>
-      </div>
-    </header>
+    <div id="root"></div>
 
-    <main class="grid">
-      <section class="card input-card">
-        <div class="card-header">
-          <div class="tabs" role="tablist">
-            <button class="tab active" data-mode="fragment" aria-pressed="true">Call data (4-byte selector + params)</button>
-            <button class="tab" data-mode="params" aria-pressed="false">Params only</button>
-          </div>
-          <p class="hint">Whitespace is ignored. Prefix with <code>0x</code> or leave it bare.</p>
-        </div>
-        <form class="stack" id="guess-form">
-          <label for="calldata" class="visually-hidden">ABI encoded data</label>
-          <textarea id="calldata" name="calldata" spellcheck="false" placeholder="0xa9059cbb000000000000000000000000..." required></textarea>
-          <div class="controls">
-            <div class="control-group">
-              <label class="file-label">
-                <input type="file" id="file-input" accept=".txt,.data,.bin,.hex">
-                <span>Upload hex file</span>
-              </label>
-              <span class="subhint">File content is read as text; binary is not supported here.</span>
-            </div>
-            <button type="submit" class="primary">Guess ABI</button>
-          </div>
-          <p id="status" class="status"></p>
-        </form>
-      </section>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
 
-      <section class="card result-card">
-        <div class="card-header">
-          <div>
-            <p class="eyebrow">Result</p>
-            <h2>Guessed signature</h2>
-          </div>
-          <div class="badge" id="mode-label">Call data mode</div>
-        </div>
-        <div id="result-body" class="result-body">
-          <p class="muted">Paste some hex to get started. The guesser will infer parameter shapes and suggest a function signature.</p>
-        </div>
-      </section>
+        // --- ICONS (Inline SVGs to avoid dependency issues) ---
+        const Icon = ({ path, className }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="24" 
+                height="24" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className}
+            >
+                {path}
+            </svg>
+        );
 
-      <section class="card explainer">
-        <div class="card-header">
-          <p class="eyebrow">How it works</p>
-          <h2>Under the hood</h2>
-        </div>
-        <div class="explainer-grid">
-          <div>
-            <h3>Selector aware</h3>
-            <p>Use <span class="code">Call data</span> mode to include the first 4 bytes (function selector) and get back a ready-to-use <span class="code">FunctionFragment</span>.</p>
-          </div>
-          <div>
-            <h3>Parameter-only</h3>
-            <p>Use <span class="code">Params only</span> mode when you already know the selector and just want the input tuple shape.</p>
-          </div>
-          <div>
-            <h3>Formatted output</h3>
-            <p>Each guess is shown in human-readable form and as a raw tuple. Click a sample above to see the flow without typing.</p>
-          </div>
-        </div>
-      </section>
-    </main>
-  </div>
+        const Icons = {
+            Database: (props) => <Icon {...props} path={<><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></>} />,
+            Search: (props) => <Icon {...props} path={<><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></>} />,
+            Copy: (props) => <Icon {...props} path={<><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></>} />,
+            Check: (props) => <Icon {...props} path={<polyline points="20 6 9 17 4 12"/>} />,
+            AlertCircle: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></>} />,
+            AlertTriangle: (props) => <Icon {...props} path={<><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>} />,
+            ShieldQuestion: (props) => <Icon {...props} path={<><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="M9.1 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3"/></>} />,
+            Terminal: (props) => <Icon {...props} path={<><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></>} />,
+            ChevronDown: (props) => <Icon {...props} path={<polyline points="6 9 12 15 18 9"/>} />
+        };
 
-  <script type="module" src="./app.js"></script>
+        // --- CORE GUESSER LOGIC ---
+        const guessAbi = (calldata) => {
+            try {
+                if (!calldata || calldata === '0x') return null;
+                
+                // Clean input: remove 0x and whitespace/newlines
+                const cleanData = (calldata.startsWith('0x') ? calldata.slice(2) : calldata).replace(/\s/g, '');
+                
+                if (cleanData.length < 8) {
+                    throw new Error("Data too short to contain a function selector");
+                }
+
+                const selector = '0x' + cleanData.slice(0, 8);
+                const paramsData = cleanData.slice(8);
+
+                let hasWarning = false;
+                let remainder = null;
+
+                if (paramsData.length === 0) {
+                    return {
+                        name: 'unknown',
+                        selector: selector,
+                        inputs: [],
+                        formatted: `unknown()`,
+                        hasWarning: false,
+                        remainder: null
+                    };
+                }
+
+                const words = [];
+                // Split into 32-byte (64 hex char) words
+                for (let i = 0; i < paramsData.length; i += 64) {
+                    const word = paramsData.slice(i, i + 64);
+                    if (word.length === 64) {
+                        words.push(word);
+                    } else {
+                        // Capture any incomplete chunk
+                        remainder = word;
+                        hasWarning = true;
+                    }
+                }
+
+                const guessedInputs = words.map((word, index) => {
+                    // Heuristic 1: Address
+                    if (word.startsWith('000000000000000000000000')) {
+                        const potentialAddress = '0x' + word.slice(24);
+                        if (ethers.isAddress(potentialAddress)) {
+                            return { type: 'address', value: potentialAddress, original: word };
+                        }
+                    }
+
+                    // Heuristic 2: Boolean
+                    if (word.match(/^0{63}[01]$/)) {
+                        return { type: 'bool', value: word.endsWith('1'), original: word };
+                    }
+
+                    // Heuristic 3: Uint256 (Default)
+                    const value = BigInt('0x' + word);
+                    return { type: 'uint256', value: value.toString(), original: word };
+                });
+
+                const typesString = guessedInputs.map(i => i.type).join(',');
+                const signature = `unknown(${typesString})`;
+
+                return {
+                    name: 'unknown',
+                    selector: selector,
+                    inputs: guessedInputs,
+                    formatted: signature,
+                    hasWarning: hasWarning,
+                    remainder: remainder
+                };
+            } catch (err) {
+                throw err;
+            }
+        };
+
+        // --- COMPONENTS ---
+
+        const ParameterRow = ({ input, idx, onCopy }) => {
+            const [format, setFormat] = useState('raw');
+
+            const asNumber = () => {
+                try {
+                    if (input.type === 'bool') return input.value ? '1' : '0';
+                    if (input.type === 'address') return 'N/A';
+                    return BigInt('0x' + input.original).toString();
+                } catch (e) {
+                    return 'Invalid number';
+                }
+            };
+
+            const asAddress = () => {
+                try {
+                    const hex = '0x' + input.original.slice(24);
+                    return ethers.isAddress(hex) ? hex : 'N/A';
+                } catch (e) {
+                    return 'N/A';
+                }
+            };
+
+            const asText = () => {
+                try {
+                    const text = ethers.toUtf8String('0x' + input.original).replace(/\0/g, '');
+                    return text.length > 0 ? text : '<empty string>';
+                } catch (e) {
+                    return 'Invalid text';
+                }
+            };
+
+            const getDisplayValue = () => {
+                if (format === 'raw') return input.original;
+                if (format === 'hex') return '0x' + input.original;
+                if (format === 'number') return asNumber();
+                if (format === 'address') return asAddress();
+                if (format === 'text') return asText();
+                return input.value?.toString?.() ?? '';
+            };
+
+            const displayValue = getDisplayValue();
+
+            return (
+                <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-12 gap-4 items-center hover:bg-slate-800/30 transition-colors group border-b border-slate-800/50 last:border-0">
+                    <div className="col-span-1 md:col-span-1 text-slate-500 font-mono text-sm">#{idx}</div>
+                    
+                    <div className="col-span-2 md:col-span-2">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                            {input.type}
+                        </span>
+                    </div>
+                    
+                    <div className="col-span-9 md:col-span-6 font-mono text-sm text-slate-300 break-all">
+                        {displayValue}
+                    </div>
+                    
+                    <div className="col-span-full md:col-span-3 flex items-center justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                        <div className="relative">
+                            <select 
+                                value={format} 
+                                onChange={(e) => setFormat(e.target.value)}
+                                className="appearance-none bg-slate-800 border border-slate-700 hover:border-blue-500/50 text-xs rounded pl-2 pr-6 py-1 text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer transition-colors"
+                            >
+                                <option value="raw">Raw (32-byte)</option>
+                                <option value="number">Number</option>
+                                <option value="hex">Hex (0x...)</option>
+                                <option value="address">Address</option>
+                                <option value="text">Text (utf8)</option>
+                            </select>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-slate-500">
+                                <Icons.ChevronDown className="w-3 h-3" />
+                            </div>
+                        </div>
+                        <button onClick={() => onCopy(displayValue)} className="p-1.5 hover:bg-slate-700 rounded text-slate-400">
+                            <Icons.Copy className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const Header = () => (
+            <header className="bg-slate-900 border-b border-slate-800 p-4">
+                <div className="max-w-5xl mx-auto flex items-center gap-3">
+                    <div className="bg-blue-600 p-2 rounded-lg">
+                        <Icons.Database className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-bold text-white">OpenChain ABI Guesser</h1>
+                        <p className="text-slate-400 text-xs">Calldata Decoder & Type Inference Interface</p>
+                    </div>
+                </div>
+            </header>
+        );
+
+        const ResultCard = ({ label, value, code = false, onCopy }) => {
+            const [copied, setCopied] = useState(false);
+
+            const handleCopy = () => {
+                if (onCopy) {
+                    onCopy();
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                }
+            };
+
+            return (
+                <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700 hover:border-slate-600 transition-colors">
+                    <div className="flex justify-between items-start mb-2">
+                        <span className="text-slate-400 text-sm font-medium uppercase tracking-wider">{label}</span>
+                        <button 
+                            onClick={handleCopy}
+                            className="text-slate-400 hover:text-white transition-colors"
+                            title="Copy to clipboard"
+                        >
+                            {copied ? <Icons.Check className="w-4 h-4 text-green-400" /> : <Icons.Copy className="w-4 h-4" />}
+                        </button>
+                    </div>
+                    <div className={`${code ? 'font-mono text-sm' : ''} text-slate-100 break-all`}>
+                        {value}
+                    </div>
+                </div>
+            );
+        };
+
+        function App() {
+            const [inputData, setInputData] = useState('');
+            const [result, setResult] = useState(null);
+            const [error, setError] = useState(null);
+            const [isGuessing, setIsGuessing] = useState(false);
+
+            const handleGuess = () => {
+                setError(null);
+                setResult(null);
+                setIsGuessing(true);
+
+                setTimeout(() => {
+                    try {
+                        const decoded = guessAbi(inputData.trim());
+                        setResult(decoded);
+                    } catch (err) {
+                        setError(err.message || "Invalid hexadecimal string or malformed data.");
+                    } finally {
+                        setIsGuessing(false);
+                    }
+                }, 400);
+            };
+
+            const copyToClipboard = (text) => {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                     navigator.clipboard.writeText(text);
+                } else {
+                    const textArea = document.createElement("textarea");
+                    textArea.value = text;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(textArea);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30">
+                    <Header />
+
+                    <main className="max-w-5xl mx-auto p-6 space-y-8">
+                        
+                        <div className="space-y-2">
+                            <h2 className="text-2xl font-semibold text-white">Analyze Transaction Data</h2>
+                            <p className="text-slate-400">
+                                Paste the raw hex input data from an Ethereum transaction below. This tool will attempt to 
+                                reverse-engineer the original function signature and argument types without an ABI.
+                            </p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="relative">
+                                <textarea
+                                    value={inputData}
+                                    onChange={(e) => setInputData(e.target.value)}
+                                    placeholder="0xa9059cbb000000000000000000000000..."
+                                    className="w-full h-32 bg-slate-900 border border-slate-700 rounded-xl p-4 font-mono text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all resize-y placeholder:text-slate-600"
+                                />
+                                <div className="absolute bottom-4 right-4 text-xs text-slate-500 font-mono">
+                                    {inputData ? `${Math.ceil((inputData.length - 2) / 2)} bytes` : '0 bytes'}
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                                <button
+                                    onClick={handleGuess}
+                                    disabled={!inputData || isGuessing}
+                                    className={`
+                                        flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-white shadow-lg shadow-blue-900/20
+                                        ${!inputData || isGuessing 
+                                        ? 'bg-slate-800 cursor-not-allowed text-slate-500' 
+                                        : 'bg-blue-600 hover:bg-blue-500 active:transform active:scale-95 transition-all'}
+                                    `}
+                                >
+                                    {isGuessing ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                            Analyzing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Icons.Search className="w-4 h-4" />
+                                            Guess ABI
+                                        </>
+                                    )}
+                                </button>
+                                
+                                <button
+                                    onClick={() => setInputData('0xa9059cbb00000000000000000000000012345678901234567890123456789012345678900000000000000000000000000000000000000000000000000de0b6b3a7640000')}
+                                    className="text-sm text-blue-400 hover:text-blue-300 underline underline-offset-4"
+                                >
+                                    Load Example (ERC20 Transfer)
+                                </button>
+                            </div>
+                        </div>
+
+                        {error && (
+                            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                                <Icons.AlertCircle className="w-5 h-5 shrink-0" />
+                                <p>{error}</p>
+                            </div>
+                        )}
+
+                        {result && (
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="flex items-center gap-2 text-green-400 font-medium">
+                                    <Icons.ShieldQuestion className="w-5 h-5" />
+                                    <span>Decoding Successful</span>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <ResultCard 
+                                        label="Function Selector" 
+                                        value={result.selector} 
+                                        code 
+                                        onCopy={() => copyToClipboard(result.selector)} 
+                                    />
+                                    <ResultCard 
+                                        label="Guessed Signature" 
+                                        value={result.formatted} 
+                                        code 
+                                        onCopy={() => copyToClipboard(result.formatted)} 
+                                    />
+                                </div>
+
+                                {result.hasWarning && (
+                                     <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 p-4 rounded-lg flex items-start gap-3">
+                                        <Icons.AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                                        <div className="w-full">
+                                            <p className="font-medium">Trailing Data Detected</p>
+                                            <p className="text-sm mt-1 text-yellow-500/80">
+                                                The input data contains bytes at the end that do not fit the 32-byte alignment. 
+                                                This data was NOT decoded as a parameter.
+                                            </p>
+                                            {result.remainder && (
+                                                <div className="mt-3">
+                                                    <div className="p-2 bg-black/30 rounded border border-yellow-500/10 font-mono text-xs break-all mb-3">
+                                                        <span className="text-slate-500">Leftover: </span>
+                                                        <span className="text-yellow-300">{result.remainder}</span>
+                                                    </div>
+                                                    
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                        <div className="bg-black/30 p-2 rounded border border-yellow-500/10">
+                                                            <div className="text-[10px] uppercase tracking-wider text-yellow-500/60 mb-1">As Number</div>
+                                                            <div className="font-mono text-xs text-yellow-200 truncate">
+                                                                {(() => {
+                                                                    try { return BigInt('0x' + result.remainder).toString(); } 
+                                                                    catch (e) { return 'Invalid'; }
+                                                                })()}
+                                                            </div>
+                                                        </div>
+                                                        <div className="bg-black/30 p-2 rounded border border-yellow-500/10">
+                                                            <div className="text-[10px] uppercase tracking-wider text-yellow-500/60 mb-1">As Text</div>
+                                                            <div className="font-mono text-xs text-yellow-200 truncate">
+                                                                {(() => {
+                                                                    try { 
+                                                                        const text = ethers.toUtf8String('0x' + result.remainder);
+                                                                        return /^[\x20-\x7E]*$/.test(text) ? `"${text}"` : 'Non-printable';
+                                                                    } 
+                                                                    catch (e) { return 'Invalid UTF-8'; }
+                                                                })()}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                                    <div className="bg-slate-800/50 px-6 py-3 border-b border-slate-800 flex justify-between items-center">
+                                        <h3 className="font-medium text-slate-200">Decoded Parameters</h3>
+                                        <span className="text-xs text-slate-500">{result.inputs.length} arguments</span>
+                                    </div>
+                                    
+                                    <div className="divide-y divide-slate-800/50">
+                                        {result.inputs.map((input, idx) => (
+                                            <ParameterRow 
+                                                key={idx} 
+                                                input={input} 
+                                                idx={idx} 
+                                                onCopy={copyToClipboard}
+                                            />
+                                        ))}
+                                        
+                                        {result.inputs.length === 0 && (
+                                            <div className="p-8 text-center text-slate-500 italic">
+                                                No parameters detected. This function likely takes no arguments.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-900 rounded-lg p-4 border border-slate-800">
+                                    <div className="flex items-center gap-2 mb-2 text-slate-400 text-sm">
+                                        <Icons.Terminal className="w-4 h-4" />
+                                        <span>Usage with Ethers.js</span>
+                                    </div>
+                                    <code className="block font-mono text-xs text-slate-500 leading-relaxed">
+                                        const iface = new ethers.Interface(["function {result.formatted}"]);
+                                        <br />
+                                        const decoded = iface.decodeFunctionData("{result.formatted.split('(')[0]}", "{inputData.slice(0, 20)}...");
+                                    </code>
+                                </div>
+
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
 </html>
