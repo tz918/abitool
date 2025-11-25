@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ABI Guesser Playground</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Chivo+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <p class="eyebrow">openchainxyz/abi-guesser</p>
+      <h1>ABI Guesser Playground</h1>
+      <p class="lede">
+        Paste call data or raw ABI-encoded parameters and let the library infer the function signature and parameter types for you.
+      </p>
+      <div class="hero-actions">
+        <button class="chip" data-fill="call">Load call data sample</button>
+        <button class="chip" data-fill="params">Load params-only sample</button>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="card input-card">
+        <div class="card-header">
+          <div class="tabs" role="tablist">
+            <button class="tab active" data-mode="fragment" aria-pressed="true">Call data (4-byte selector + params)</button>
+            <button class="tab" data-mode="params" aria-pressed="false">Params only</button>
+          </div>
+          <p class="hint">Whitespace is ignored. Prefix with <code>0x</code> or leave it bare.</p>
+        </div>
+        <form class="stack" id="guess-form">
+          <label for="calldata" class="visually-hidden">ABI encoded data</label>
+          <textarea id="calldata" name="calldata" spellcheck="false" placeholder="0xa9059cbb000000000000000000000000..." required></textarea>
+          <div class="controls">
+            <div class="control-group">
+              <label class="file-label">
+                <input type="file" id="file-input" accept=".txt,.data,.bin,.hex">
+                <span>Upload hex file</span>
+              </label>
+              <span class="subhint">File content is read as text; binary is not supported here.</span>
+            </div>
+            <button type="submit" class="primary">Guess ABI</button>
+          </div>
+          <p id="status" class="status"></p>
+        </form>
+      </section>
+
+      <section class="card result-card">
+        <div class="card-header">
+          <div>
+            <p class="eyebrow">Result</p>
+            <h2>Guessed signature</h2>
+          </div>
+          <div class="badge" id="mode-label">Call data mode</div>
+        </div>
+        <div id="result-body" class="result-body">
+          <p class="muted">Paste some hex to get started. The guesser will infer parameter shapes and suggest a function signature.</p>
+        </div>
+      </section>
+
+      <section class="card explainer">
+        <div class="card-header">
+          <p class="eyebrow">How it works</p>
+          <h2>Under the hood</h2>
+        </div>
+        <div class="explainer-grid">
+          <div>
+            <h3>Selector aware</h3>
+            <p>Use <span class="code">Call data</span> mode to include the first 4 bytes (function selector) and get back a ready-to-use <span class="code">FunctionFragment</span>.</p>
+          </div>
+          <div>
+            <h3>Parameter-only</h3>
+            <p>Use <span class="code">Params only</span> mode when you already know the selector and just want the input tuple shape.</p>
+          </div>
+          <div>
+            <h3>Formatted output</h3>
+            <p>Each guess is shown in human-readable form and as a raw tuple. Click a sample above to see the flow without typing.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
